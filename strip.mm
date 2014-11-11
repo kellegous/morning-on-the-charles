@@ -139,14 +139,7 @@ void FindTransforms(
     std::vector<Tx>* translations,
     std::vector<std::shared_ptr<Photo> > photos) {
 
-  util::File log;
-  Status did = log.Open("logc.txt", "w");
-  if (!did.ok()) {
-    Panic(did.what());
-  }
-
   cv::FlannBasedMatcher matcher;
-  // cv::BFMatcher matcher;
 
   std::vector<cv::DMatch> matches;
   Tx translation(0.0, 0.0);
@@ -163,11 +156,6 @@ void FindTransforms(
       photos[i+1]->key_points,
       matches,
       &dx, &dy);
-
-    fprintf(log.get(), "%s, %s, %0.4f, %0.4f\n",
-      photos[i]->filename.c_str(),
-      photos[i+1]->filename.c_str(),
-      dx, dy);
 
     translation.x += dx;
     translation.y += dy;
@@ -318,11 +306,10 @@ int main(int argc, char* argv[]) {
   FindTransforms(&transforms, photos);
 
   SelectStrips(photos, transforms);
-  //PruneStrips(photos, transforms);
 
   printf("photos: %ld, transforms: %ld\n", photos.size(), transforms.size());
 
-  std::string dest("_out");
+  std::string dest("out");
   if (!util::IsDirectory(dest)) {
     did = util::MakeDirectory(dest);
     if (!did.ok()) {
