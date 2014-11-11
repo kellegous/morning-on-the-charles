@@ -240,14 +240,59 @@ Status RenderDebug(
   return NoErr();
 }
 
-Status Render(
+Status RenderSlices(
     const std::string& dest,
     std::vector<std::shared_ptr<Photo> >& photos,
     std::vector<Tx>& transforms) {
   double top, bot;
   FindVerticalBounds(&top, &bot, transforms);
 
-  printf("top = %0.2f, bot = %0.2f\n", top, bot);
+  int w = photos[0]->image.cols;
+  int h = photos[0]->image.rows;
+
+  int dx = w / photos.size();
+
+  for (int i = 0, n = photos.size(); i < n; i++) {
+    AutoRef<CGImageRef> img;
+    Status did = gr::LoadFromFile(img.addr(), photos[i]->filename);
+    if (!did.ok()) {
+      return did;
+    }
+
+    Tx tx = transforms[i];
+
+    AutoRef<CGContextRef> ctx = gr::NewContext(dx, h - (int)top + (int)bot);
+
+    CGContextSetRGBFillColor(ctx, 0.0, 0.0, 0.0, 1.0);
+    CGContextFillRect(ctx, CGRectMake(0, 0, dx, h - (int)top + (int)bot));
+
+    AutoRef<CGImageRef> src = CGImageCreateWithImageInRect(
+        img,
+        CGRectMake(dx*i+tx.x, tx.y, dx, h));
+
+    CGContextDrawImage(ctx, CGRectMake(0, 0, dx, h), src);
+
+    std::string name;
+    util::StringFormat(&name, "s%02d.jpg", i);
+
+    std::string path(dest);
+    util::PathJoin(&path, name);
+
+    did = gr::ExportAsJpg(ctx, path, 0.9);
+    if (!did.ok()) {
+      return did;
+    }
+  }
+
+  return NoErr();
+}
+
+Status Render(
+    const std::string& dest,
+    std::vector<std::shared_ptr<Photo> >& photos,
+    std::vector<Tx>& transforms) {
+  double top, bot;
+  FindVerticalBounds(&top, &bot, transforms);
 
   int w = photos[0]->image.cols;
   int h = photos[0]->image.rows;
@@ -256,7 +301,7 @@ Status Render(
 
   AutoRef<CGContextRef> ctx = gr::NewContext(w, h - (int)top + (int)bot);
 
-  CGContextSetRGBFillColor(ctx, 1.0, 0.0, 0.0, 1.0);
+  CGContextSetRGBFillColor(ctx, 0.0, 0.0, 0.0, 1.0);
   CGContextFillRect(ctx, CGRectMake(0, 0, w, h-top+bot));
 
   for (int i = 0, n = photos.size(); i < n; i++) {
@@ -289,11 +334,13 @@ void PrintUsage() {
 
 bool ParseArgs(int argc, char* argv[],
     std::string* src_file,
-    std::string* dest_dir) {
+    std::string* dest_dir,
+    bool* debug_transforms) {
   int c;
 
   while (true) {
     static struct option opts[] = {
+      { "debug-transforms", no_argument, 0, 't' },
       { "dest", required_argument, 0, 'd' },
       { 0, 0, 0, 0}
     };
@@ -308,6 +355,9 @@ bool ParseArgs(int argc, char* argv[],
     switch (c) {
     case 'd':
       dest_dir->assign(optarg);
+      break;
+    case 't':
+      *debug_transforms = true;
       break;
     default:
       PrintUsage();
@@ -331,8 +381,9 @@ int main(int argc, char* argv[]) {
 
   std::string dest("out");
   std::string data("day.txt");
+  bool debug_transforms = false;
 
-  if (!ParseArgs(argc, argv, &data, &dest)) {
+  if (!ParseArgs(argc, argv, &data, &dest, &debug_transforms)) {
     return 1;
   }
 
@@ -360,12 +411,19 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  did = RenderDebug(dest, photos, transforms);
+  if (debug_transforms) {
+    did = RenderDebug(dest, photos, transforms);
+    if (!did.ok()) {
+      Panic(did.what());
+    }
+  }
+
+  did = Render(dest, photos, transforms);
   if (!did.ok()) {
     Panic(did.what());
   }
 
-  did = Render(dest, photos, transforms);
+  did = RenderSlices(dest, photos, transforms);
   if (!did.ok()) {
     Panic(did.what());
   }
