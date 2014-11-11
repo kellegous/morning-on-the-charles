@@ -283,6 +283,10 @@ Status Render(
   return gr::ExportAsJpg(ctx, path, 0.9);
 }
 
+void PrintUsage() {
+  fprintf(stderr, "Usage: strip [--dest=dir] file_list\n");
+}
+
 bool ParseArgs(int argc, char* argv[],
     std::string* src_file,
     std::string* dest_dir) {
@@ -304,17 +308,19 @@ bool ParseArgs(int argc, char* argv[],
     switch (c) {
     case 'd':
       dest_dir->assign(optarg);
-    case '?':
-      return false;
+      break;
     default:
-      abort();
+      PrintUsage();
+      return false;
     }
   }
 
   if (argc - optind != 1) {
-    fprintf(stderr, "usage\n");
+    PrintUsage();
     return false;
   }
+
+  src_file->assign(argv[optind]);
 
   return true;
 }
