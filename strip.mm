@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <getopt.h>
 #include <memory>
 #include <stdio.h>
 #include <math.h>
@@ -38,7 +39,7 @@ struct Tx {
   double x, y;
 };
 
-Status ReadFileList(std::vector<std::string>* out, const char* filename) {
+Status ReadFileList(std::vector<std::string>* out, std::string& filename) {
   std::ifstream r(filename);
   if (!r.is_open()) {
     return ERR("unable to open file");
@@ -72,10 +73,7 @@ void Panic(const std::string& msg) {
   exit(1);
 }
 
-Status LoadPhotos(
-    std::vector<std::shared_ptr<Photo> >* photos,
-    const char* root,
-    const char* filename) {
+Status LoadPhotos( std::vector<std::shared_ptr<Photo> >* photos, std::string& filename) {
   std::vector<std::string> filenames;
   Status did = ReadFileList(&filenames, filename);
   if (!did.ok()) {
@@ -85,11 +83,8 @@ Status LoadPhotos(
   cv::SurfFeatureDetector detector(400);
   cv::SurfDescriptorExtractor extractor;
 
-  std::string base(root);
   for (int i = 0, n = filenames.size(); i < n; i++) {
-    std::string path(base);
-    util::PathJoin(&path, filenames[i]);
-
+    const std::string path(filenames[i]);
     cv::Mat img = cv::imread(path.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
     if (!img.data) {
       std::string err;
@@ -288,13 +283,56 @@ Status Render(
   return gr::ExportAsJpg(ctx, path, 0.9);
 }
 
+bool ParseArgs(int argc, char* argv[],
+    std::string* src_file,
+    std::string* dest_dir) {
+  int c;
+
+  while (true) {
+    static struct option opts[] = {
+      { "dest", required_argument, 0, 'd' },
+      { 0, 0, 0, 0}
+    };
+
+    int opt_index = 0;
+
+    c = getopt_long(argc, argv, "", opts, &opt_index);
+    if (c == -1) {
+      break;
+    }
+
+    switch (c) {
+    case 'd':
+      dest_dir->assign(optarg);
+    case '?':
+      return false;
+    default:
+      abort();
+    }
+  }
+
+  if (argc - optind != 1) {
+    fprintf(stderr, "usage\n");
+    return false;
+  }
+
+  return true;
+}
+
 } // anonymous
 
 int main(int argc, char* argv[]) {
 
+  std::string dest("out");
+  std::string data("day.txt");
+
+  if (!ParseArgs(argc, argv, &data, &dest)) {
+    return 1;
+  }
+
   std::vector<std::shared_ptr<Photo> > photos;
 
-  Status did = LoadPhotos(&photos, "photos", "day.txt");
+  Status did = LoadPhotos(&photos, data);
   if (!did.ok()) {
     Panic(did.what());
   }
@@ -309,7 +347,6 @@ int main(int argc, char* argv[]) {
 
   printf("photos: %ld, transforms: %ld\n", photos.size(), transforms.size());
 
-  std::string dest("out");
   if (!util::IsDirectory(dest)) {
     did = util::MakeDirectory(dest);
     if (!did.ok()) {
