@@ -1,5 +1,5 @@
-CFLAGS=-Wall $(shell pkg-config --cflags opencv)
-LDFLAGS=$(shell pkg-config --libs opencv) -framework Cocoa -lcurl
+CFLAGS=-Wall $(shell pkg-config --cflags opencv exiv2)
+LDFLAGS=$(shell pkg-config --libs opencv exiv2) -framework Cocoa -lcurl
 
 OBJS=util.o status.o gr.o
 

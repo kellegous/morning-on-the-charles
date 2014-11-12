@@ -3,10 +3,12 @@
 #include <algorithm>
 #include <fstream>
 #include <getopt.h>
+#include <math.h>
 #include <memory>
 #include <stdio.h>
-#include <math.h>
+#include <time.h>
 #include <Cocoa/Cocoa.h>
+#include <exiv2/exiv2.hpp>
 #include "opencv2/core/core.hpp"
 #include "opencv2/features2d/features2d.hpp"
 #include "opencv2/nonfree/features2d.hpp"
@@ -375,6 +377,84 @@ bool ParseArgs(int argc, char* argv[],
   return true;
 }
 
+Status ExtractExifDate(std::string* out, const char* format, std::string filename) {
+  try {
+    Exiv2::Image::AutoPtr image = Exiv2::ImageFactory::open(filename.c_str());
+    if (!image.get()) {
+      std::string err;
+      util::StringFormat(&err, "open failed: %s", filename.c_str());
+      return ERR(err.c_str());
+    }
+
+    image->readMetadata();
+    Exiv2::ExifData& data = image->exifData();
+    if (data.empty()) {
+      std::string err;
+      util::StringFormat(&err, "empty exif data: %s", filename.c_str());
+      return ERR(err.c_str());
+    }
+
+    Exiv2::ExifKey key("Exif.Photo.DateTimeOriginal");
+    Exiv2::ExifData::const_iterator it = data.findKey(key);
+    if (it == data.end()) {
+      std::string err;
+      util::StringFormat(&err, "no datetime: %s", filename.c_str());
+      return ERR(err.c_str());
+    }
+
+    char buf[20];
+    struct tm tm;
+
+    memset(&tm, 0, sizeof(struct tm));
+    if (strptime(it->value().toString().c_str(), "%Y:%m:%d %H:%M:%S", &tm) == NULL) {
+      std::string err;
+      util::StringFormat(&err, "invalid date: %s", filename.c_str());
+      return ERR(err.c_str());
+    }
+
+    strftime(buf, sizeof(buf), format, &tm);
+    out->assign(buf);
+  } catch (Exiv2::AnyError& e) {
+    std::string err;
+    util::StringFormat(&err, "exif failed: %s", e.what());
+    return ERR(err.c_str());
+  }
+
+  return NoErr();
+}
+
+Status WriteInfoFile(std::string& filename, std::vector<std::shared_ptr<Photo> >& photos) {
+  util::File file;
+  Status did = file.Open(filename.c_str(), "w");
+  if (!did.ok()) {
+    return did;
+  }
+
+  std::string t;
+  if (fprintf(file.get(), "[\n") < 0) {
+    return ERR("write error");
+  }
+
+  for (int i = 0, n = photos.size(); i < n; i++) {
+    did = ExtractExifDate(&t, "%I:%M%p", photos[i]->filename);
+    if (!did.ok()) {
+      return did;
+    }
+
+    if (fprintf(file.get(),
+        (i < n-1) ? "  \"%s\",\n" : "  \"%s\"\n",
+        t.c_str()) < 0) {
+      return ERR("write error");
+    }
+  }
+
+  if (fprintf(file.get(), "]\n") < 0) {
+    return ERR("write error");
+  }
+
+  return NoErr();
+}
+
 } // anonymous
 
 int main(int argc, char* argv[]) {
@@ -424,6 +504,13 @@ int main(int argc, char* argv[]) {
   }
 
   did = RenderSlices(dest, photos, transforms);
+  if (!did.ok()) {
+    Panic(did.what());
+  }
+
+  std::string info(dest);
+  util::PathJoin(&info, "info.json");
+  did = WriteInfoFile(info, photos);
   if (!did.ok()) {
     Panic(did.what());
   }
