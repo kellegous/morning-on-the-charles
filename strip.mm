@@ -102,8 +102,7 @@ Status LoadPhotos( std::vector<std::shared_ptr<Photo> >* photos, std::string& fi
     fflush(stdout);
   }
 
-  fprintf(stdout, "\n");
-
+  printf("\ndone\n");
   return NoErr();
 }
 
@@ -141,6 +140,7 @@ void FindTransforms(
   std::vector<cv::DMatch> matches;
   Tx translation(0.0, 0.0);
   translations->push_back(translation);
+
   for (int i = 0, n = photos.size() - 1; i < n; i++) {
     matches.clear();
 
@@ -157,7 +157,16 @@ void FindTransforms(
     translation.x += dx;
     translation.y += dy;
     translations->push_back(translation);
+
+    fprintf(stdout, "\r[ %02d / %02d ] : %s & %s",
+      i+1,
+      n,
+      photos[i]->filename.c_str(),
+      photos[i+1]->filename.c_str());
+    fflush(stdout);
   }
+
+  printf("\ndone\n");
 }
 
 void SelectStrips(std::vector<std::shared_ptr<Photo> >& photos, std::vector<Tx>& transforms) {
@@ -284,8 +293,12 @@ Status RenderSlices(
     if (!did.ok()) {
       return did;
     }
+
+    fprintf(stdout, "\r[ %02d / %02d ] : s%02d.jpg", i, n, i);
+    fflush(stdout);
   }
 
+  printf("\ndone\n");
   return NoErr();
 }
 
@@ -474,15 +487,11 @@ int main(int argc, char* argv[]) {
     Panic(did.what());
   }
 
-  printf("Loaded %ld images\n", photos.size());
-
   std::vector<Tx> transforms;
 
   FindTransforms(&transforms, photos);
 
   SelectStrips(photos, transforms);
-
-  printf("photos: %ld, transforms: %ld\n", photos.size(), transforms.size());
 
   if (!util::IsDirectory(dest)) {
     did = util::MakeDirectory(dest);
