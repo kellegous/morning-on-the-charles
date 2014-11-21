@@ -1,5 +1,3 @@
-#include "strip.h"
-
 #include <algorithm>
 #include <fstream>
 #include <getopt.h>
