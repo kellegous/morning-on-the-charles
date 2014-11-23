@@ -13,17 +13,17 @@ CGContextRef NewContext(uint8_t* data, int w, int h);
 
 CGRect BoundsOf(CGContextRef ctx);
 
-Status ExportAsPng(CGImageRef img, std::string& filename);
+Status ExportAsPng(CGImageRef img, const std::string& filename);
 
-Status ExportAsPng(CGContextRef ctx, std::string& filename);
+Status ExportAsPng(CGContextRef ctx, const std::string& filename);
 
-Status ExportAsJpg(CGContextRef ctx, std::string& filename, float qual);
+Status ExportAsJpg(CGContextRef ctx, const std::string& filename, float qual);
 
-Status ExportAsJpg(CGContextRef ctx, std::string& filename, float qual);
+Status ExportAsJpg(CGContextRef ctx, const std::string& filename, float qual);
 
-Status LoadFromUrl(CGImageRef* img, std::string& url);
+Status LoadFromUrl(CGImageRef* img, const std::string& url);
 
-Status LoadFromFile(CGImageRef* img, std::string& filename);
+Status LoadFromFile(CGImageRef* img, const std::string& filename);
 
 void DrawCoveringImage(CGContextRef ctx, CGImageRef img);
 

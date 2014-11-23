@@ -1,10 +1,11 @@
 #include "gr.h"
 
 #include "auto_ref.h"
+#include "util.h"
 
 namespace {
 
-Status FileUrlFromString(CFURLRef* url, std::string& filename) {
+Status FileUrlFromString(CFURLRef* url, const std::string& filename) {
   AutoRef<CFStringRef> fn = CFStringCreateWithCStringNoCopy(
       NULL,
       filename.c_str(),
@@ -48,7 +49,7 @@ Status LoadFromCfUrl(CGImageRef* img, CFURLRef url) {
 }
 
 Status Export(CGImageRef img,
-    std::string& filename,
+    const std::string& filename,
     CFStringRef format,
     CFMutableDictionaryRef opts) {
   Status did;
@@ -65,7 +66,10 @@ Status Export(CGImageRef img,
       1,
       NULL);
   if (!dst) {
-    return ERR("cannot create imate destination");
+    std::string err;
+    util::StringFormat(&err, "cannot create image destination: %s",
+      filename.c_str());
+    return ERR(err.c_str());
   }
 
   CGImageDestinationAddImage(dst, img, opts);
@@ -104,7 +108,7 @@ CGRect BoundsOf(CGContextRef ctx) {
 }
 
 
-Status ExportAsJpg(CGImageRef img, std::string& filename, float qual) {
+Status ExportAsJpg(CGImageRef img, const std::string& filename, float qual) {
   CFMutableDictionaryRef opts = CFDictionaryCreateMutable(
       nil,
       0,
@@ -117,7 +121,7 @@ Status ExportAsJpg(CGImageRef img, std::string& filename, float qual) {
   return Export(img, filename, kUTTypeJPEG, opts);
 }
 
-Status ExportAsJpg(CGContextRef ctx, std::string& filename, float qual) {
+Status ExportAsJpg(CGContextRef ctx, const std::string& filename, float qual) {
   AutoRef<CGImageRef> img = CGBitmapContextCreateImage(ctx);
   if (!img) {
     return ERR("cannot create image");
@@ -126,12 +130,12 @@ Status ExportAsJpg(CGContextRef ctx, std::string& filename, float qual) {
 }
 
 //
-Status ExportAsPng(CGImageRef img, std::string& filename) {
+Status ExportAsPng(CGImageRef img, const std::string& filename) {
   return Export(img, filename, kUTTypePNG, NULL);
 }
 
 //
-Status ExportAsPng(CGContextRef ctx, std::string& filename) {
+Status ExportAsPng(CGContextRef ctx, const std::string& filename) {
   AutoRef<CGImageRef> img = CGBitmapContextCreateImage(ctx);
   if (!img) {
     return ERR("cannot create image");
@@ -141,7 +145,7 @@ Status ExportAsPng(CGContextRef ctx, std::string& filename) {
 }
 
 //
-Status LoadFromUrl(CGImageRef* img, std::string& url) {
+Status LoadFromUrl(CGImageRef* img, const std::string& url) {
   *img = NULL;
 
   AutoRef<CFStringRef> cfUrlStr = CFStringCreateWithCStringNoCopy(
@@ -164,7 +168,7 @@ Status LoadFromUrl(CGImageRef* img, std::string& url) {
   return LoadFromCfUrl(img, cfUrl);
 }
 
-Status LoadFromFile(CGImageRef* img, std::string& filename) {
+Status LoadFromFile(CGImageRef* img, const std::string& filename) {
   *img = NULL;
 
   AutoRef<CFURLRef> url;

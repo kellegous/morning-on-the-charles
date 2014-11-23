@@ -4,6 +4,7 @@
 #include <math.h>
 #include <memory>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <Cocoa/Cocoa.h>
 #include <exiv2/exiv2.hpp>
@@ -197,7 +198,7 @@ void FindVerticalBounds(double* top, double* bot, std::vector<Tx>& transforms) {
   *bot = b;
 }
 
-Status RenderDebug(
+Status RenderOverlayForEachTransform(
     const std::string& dest,
     std::vector<std::shared_ptr<Photo> >& photos,
     std::vector<Tx> transforms) {
@@ -247,6 +248,53 @@ Status RenderDebug(
   }
 
   return NoErr();
+}
+
+Status RenderTransformMap(
+    const std::string& dest,
+    float dst_width,
+    float photo_width,
+    float photo_height,
+    std::vector<Tx>& transforms) {
+
+  static float padding = 10.0;
+
+  double minX = 0.0, maxX = 0.0, minY = 0.0, maxY = 0.0;
+  for (int i = 0, n = transforms.size(); i < n; i++) {
+    Tx tx = transforms[i];
+    minX = std::min(tx.x, minX);
+    minY = std::min(tx.y, minY);
+    maxX = std::max(tx.x, maxX);
+    maxY = std::max(tx.y, maxY);
+  }
+
+  double vw = photo_width + maxX - minX;
+  double vh = photo_height + maxY - minY;
+
+  double ar = vw / vh;
+  double sf = (dst_width - padding*2.0) / vw;
+  CGRect view = CGRectMake(0, 0, dst_width, (dst_width - padding*2.0) / ar + padding*2.0);
+
+  AutoRef<CGContextRef> ctx = gr::NewContext(
+      CGRectGetWidth(view),
+      CGRectGetHeight(view));
+
+  CGContextTranslateCTM(ctx, padding, padding);
+
+  CGContextSetRGBStrokeColor(ctx, 1.0, 0.0, 0.6, 1.0);
+  CGContextSetLineWidth(ctx, 2.0);
+  for (int i = 0, n = transforms.size(); i < n; i++) {
+    Tx tx = transforms[i];
+
+    CGRect r = CGRectMake(
+        sf * (tx.x - minX),
+        sf * (tx.y - minY),
+        sf * photo_width,
+        sf * photo_height);
+    CGContextStrokeRect(ctx, r);
+  }
+
+  return gr::ExportAsPng(ctx, dest);
 }
 
 Status RenderSlices(
@@ -348,12 +396,14 @@ void PrintUsage() {
 bool ParseArgs(int argc, char* argv[],
     std::string* src_file,
     std::string* dest_dir,
-    bool* debug_transforms) {
+    bool* render_overlay_for_each_transform,
+    bool* render_transform_map) {
   int c;
 
   while (true) {
     static struct option opts[] = {
-      { "debug-transforms", no_argument, 0, 't' },
+      { "render-overlay-for-each-transform", no_argument, 0, 't' },
+      { "render-transform-map", no_argument, 0, 'm'},
       { "dest", required_argument, 0, 'd' },
       { 0, 0, 0, 0}
     };
@@ -370,7 +420,10 @@ bool ParseArgs(int argc, char* argv[],
       dest_dir->assign(optarg);
       break;
     case 't':
-      *debug_transforms = true;
+      *render_overlay_for_each_transform = true;
+      break;
+    case 'm':
+      *render_transform_map = true;
       break;
     default:
       PrintUsage();
@@ -472,9 +525,14 @@ int main(int argc, char* argv[]) {
 
   std::string dest("out");
   std::string data("day.txt");
-  bool debug_transforms = false;
+  bool render_overlay_for_each_transform = false;
+  bool render_transform_map = false;
 
-  if (!ParseArgs(argc, argv, &data, &dest, &debug_transforms)) {
+  if (!ParseArgs(argc, argv,
+      &data,
+      &dest,
+      &render_overlay_for_each_transform,
+      &render_transform_map)) {
     return 1;
   }
 
@@ -498,8 +556,22 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (debug_transforms) {
-    did = RenderDebug(dest, photos, transforms);
+  if (render_overlay_for_each_transform) {
+    did = RenderOverlayForEachTransform(dest, photos, transforms);
+    if (!did.ok()) {
+      Panic(did.what());
+    }
+  }
+
+  if (render_transform_map) {
+    std::string file(dest);
+    util::PathJoin(&file, "transform.png");
+    did = RenderTransformMap(
+        file,
+        900,
+        photos[0]->image.cols,
+        photos[0]->image.rows,
+        transforms);
     if (!did.ok()) {
       Panic(did.what());
     }
