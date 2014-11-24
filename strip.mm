@@ -281,7 +281,7 @@ Status RenderTransformMap(
 
   CGContextTranslateCTM(ctx, padding, padding);
 
-  CGContextSetRGBStrokeColor(ctx, 1.0, 0.0, 0.6, 1.0);
+  CGContextSetRGBStrokeColor(ctx, 0.7, 0.3, 0.15, 0.6);
   CGContextSetLineWidth(ctx, 2.0);
   for (int i = 0, n = transforms.size(); i < n; i++) {
     Tx tx = transforms[i];
@@ -547,6 +547,20 @@ int main(int argc, char* argv[]) {
 
   FindTransforms(&transforms, photos);
 
+  if (render_transform_map) {
+    std::string file(dest);
+    util::PathJoin(&file, "transform.png");
+    did = RenderTransformMap(
+        file,
+        900,
+        photos[0]->image.cols,
+        photos[0]->image.rows,
+        transforms);
+    if (!did.ok()) {
+      Panic(did.what());
+    }
+  }
+  
   SelectStrips(photos, transforms);
 
   if (!util::IsDirectory(dest)) {
@@ -558,20 +572,6 @@ int main(int argc, char* argv[]) {
 
   if (render_overlay_for_each_transform) {
     did = RenderOverlayForEachTransform(dest, photos, transforms);
-    if (!did.ok()) {
-      Panic(did.what());
-    }
-  }
-
-  if (render_transform_map) {
-    std::string file(dest);
-    util::PathJoin(&file, "transform.png");
-    did = RenderTransformMap(
-        file,
-        900,
-        photos[0]->image.cols,
-        photos[0]->image.rows,
-        transforms);
     if (!did.ok()) {
       Panic(did.what());
     }
