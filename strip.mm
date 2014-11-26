@@ -281,7 +281,7 @@ Status RenderTransformMap(
 
   CGContextTranslateCTM(ctx, padding, padding);
 
-  CGContextSetRGBStrokeColor(ctx, 0.7, 0.3, 0.15, 0.6);
+  CGContextSetRGBStrokeColor(ctx, 0.2, 0.2, 0.2, 0.5);
   CGContextSetLineWidth(ctx, 2.0);
   for (int i = 0, n = transforms.size(); i < n; i++) {
     Tx tx = transforms[i];

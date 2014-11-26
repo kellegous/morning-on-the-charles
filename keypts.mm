@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string>
 #include <Cocoa/Cocoa.h>
 #include "opencv2/core/core.hpp"
@@ -49,19 +50,34 @@ Status Render(std::string& src, std::string& dst, std::vector<cv::KeyPoint>& key
 
   CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), img);
 
-  CGContextSetRGBStrokeColor(ctx, 1.0, 0.6, 0.0, 1.0);
+  CGContextTranslateCTM(ctx, 0, h);
+  CGContextScaleCTM(ctx, 1.0, -1.0);
+  CGContextSetLineWidth(ctx, 2.0);
+  CGContextSetRGBFillColor(ctx, 1.0, 1.0, 1.0, 0.2);
+  CGContextSetRGBStrokeColor(ctx, 1.0, 1.0, 1.0, 0.6);
   for (int i = 0, n = keypoints.size(); i < n; i++) {
     cv::KeyPoint k = keypoints[i];
-    CGContextStrokeEllipseInRect(ctx,
-      CGRectMake(k.pt.x - k.size/2.0, k.pt.y - k.size/2.0, k.size, k.size));
+    CGRect r = CGRectMake(k.pt.x - k.size/2.0, k.pt.y - k.size/2.0, k.size, k.size);
+    CGContextStrokeEllipseInRect(ctx, r);
+    CGContextFillEllipseInRect(ctx, r);
   }
 
-  did = gr::ExportAsPng(ctx, dst);
+  did = gr::ExportAsJpg(ctx, dst, 0.8);
   if (!did.ok()) {
     return did;
   }
 
   return NoErr();
+}
+
+void FilterKeyPoints(std::vector<cv::KeyPoint>* out, std::vector<cv::KeyPoint>& pts, double p) {
+  srand(0x422);
+  for (std::vector<cv::KeyPoint>::iterator it = pts.begin(); it != pts.end(); it++) {
+    double r = ((double) rand() / (RAND_MAX));
+    if (r < p) {
+      out->push_back(*it);
+    }
+  }
 }
 
 } // anonymous
@@ -85,7 +101,10 @@ int main(int argc, char* argv[]) {
 
   detector.detect(img, keypoints);
 
-  Status did = Render(src, dst, keypoints);
+  std::vector<cv::KeyPoint> filtered;
+  FilterKeyPoints(&filtered, keypoints, 0.1);
+
+  Status did = Render(src, dst, filtered);
   if (!did.ok()) {
     Panic(did.what());
   }
