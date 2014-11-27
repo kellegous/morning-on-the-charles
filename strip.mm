@@ -232,7 +232,6 @@ Status RenderOverlayForEachTransform(
 
     CGContextSaveGState(ctx);
     CGContextSetAlpha(ctx, 0.5);
-    CGContextTranslateCTM(ctx, -tx, -ty);
     CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), imb);
     CGContextRestoreGState(ctx);
 

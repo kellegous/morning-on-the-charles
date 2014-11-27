@@ -53,13 +53,17 @@ Status Render(std::string& src, std::string& dst, std::vector<cv::KeyPoint>& key
   CGContextTranslateCTM(ctx, 0, h);
   CGContextScaleCTM(ctx, 1.0, -1.0);
   CGContextSetLineWidth(ctx, 2.0);
-  CGContextSetRGBFillColor(ctx, 1.0, 1.0, 1.0, 0.2);
-  CGContextSetRGBStrokeColor(ctx, 1.0, 1.0, 1.0, 0.6);
+  // CGContextSetRGBFillColor(ctx, 1.0, 1.0, 1.0, 0.2);
+  // CGContextSetRGBStrokeColor(ctx, 1.0, 1.0, 1.0, 0.6);
+  CGContextSetRGBFillColor(ctx, 1.0, 0.6, 0.0, 0.05);
+  CGContextSetRGBStrokeColor(ctx, 1.0, 0.6, 0.0, 0.5);
+  // static float size = 10.0;
   for (int i = 0, n = keypoints.size(); i < n; i++) {
     cv::KeyPoint k = keypoints[i];
     CGRect r = CGRectMake(k.pt.x - k.size/2.0, k.pt.y - k.size/2.0, k.size, k.size);
-    CGContextStrokeEllipseInRect(ctx, r);
+    // CGRect r = CGRectMake(k.pt.x - size/2.0, k.pt.y - size/2.0, size, size);
     CGContextFillEllipseInRect(ctx, r);
+    CGContextStrokeEllipseInRect(ctx, r);
   }
 
   did = gr::ExportAsJpg(ctx, dst, 0.8);
@@ -102,9 +106,9 @@ int main(int argc, char* argv[]) {
   detector.detect(img, keypoints);
 
   std::vector<cv::KeyPoint> filtered;
-  FilterKeyPoints(&filtered, keypoints, 0.1);
+  // FilterKeyPoints(&filtered, keypoints, 0.1);
 
-  Status did = Render(src, dst, filtered);
+  Status did = Render(src, dst, keypoints);
   if (!did.ok()) {
     Panic(did.what());
   }
