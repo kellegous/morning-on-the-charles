@@ -55,8 +55,8 @@ Status Render(std::string& src, std::string& dst, std::vector<cv::KeyPoint>& key
   CGContextSetLineWidth(ctx, 2.0);
   // CGContextSetRGBFillColor(ctx, 1.0, 1.0, 1.0, 0.2);
   // CGContextSetRGBStrokeColor(ctx, 1.0, 1.0, 1.0, 0.6);
-  CGContextSetRGBFillColor(ctx, 1.0, 0.6, 0.0, 0.05);
-  CGContextSetRGBStrokeColor(ctx, 1.0, 0.6, 0.0, 0.5);
+  CGContextSetRGBFillColor(ctx, 0.6, 0.0, 0.0, 0.05);
+  CGContextSetRGBStrokeColor(ctx, 0.6, 0.0, 0.0, 0.5);
   // static float size = 10.0;
   for (int i = 0, n = keypoints.size(); i < n; i++) {
     cv::KeyPoint k = keypoints[i];

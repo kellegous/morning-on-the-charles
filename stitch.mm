@@ -113,14 +113,15 @@ Status Render(const std::string& dest,
   CGContextScaleCTM(ctx, 1.0, -1.0);
   CGContextSetLineWidth(ctx, 2.0);
 
-  CGContextSetRGBStrokeColor(ctx, 1.0, 0.6, 0.0, 1.0);
-  CGContextSetRGBFillColor(ctx, 1.0, 0.6, 0.0, 1.0);
 
   float min, max;
   FindMaxAndMin(&min, &max, matches);
 
   static float limit = 0.65;
   static float size = 10;
+
+  // CGContextSetRGBStrokeColor(ctx, 1.0, 0.6, 0.0, 1.0);
+  CGContextSetRGBStrokeColor(ctx, 0.6, 0.0, 0.0, 1.0);
 
   for (int i = 0, n = matches.size(); i < n; i++) {
     cv::Point2f pa = kp_a[matches[i].queryIdx].pt;
@@ -135,12 +136,63 @@ Status Render(const std::string& dest,
     CGContextMoveToPoint(ctx, pa.x, pa.y);
     CGContextAddLineToPoint(ctx, pb.x, pb.y);
     CGContextStrokePath(ctx);
-    CGContextFillEllipseInRect(ctx, CGRectMake(pa.x - size/2, pa.y - size/2, size, size));
-    CGContextFillEllipseInRect(ctx, CGRectMake(pb.x - size/2, pb.y - size/2, size, size));
+
+    CGRect ea = CGRectMake(pa.x - size/2, pa.y - size/2, size, size);
+    CGRect eb = CGRectMake(pb.x - size/2, pb.y - size/2, size, size);
+
+    CGContextSetRGBFillColor(ctx, 1.0, 1.0, 1.0, 1.0);
+    CGContextFillEllipseInRect(ctx, ea);
+    CGContextFillEllipseInRect(ctx, eb);
+
+    CGContextSetRGBStrokeColor(ctx, 0.6, 0.0, 0.0, 1.0);
+    CGContextStrokeEllipseInRect(ctx, ea); 
+    CGContextStrokeEllipseInRect(ctx, eb); 
+
     CGContextRestoreGState(ctx);
   }
 
   return gr::ExportAsJpg(ctx, dest, 0.9);
+}
+
+bool ReadFeatureDescriptors(const std::string& path,
+    std::vector<cv::KeyPoint>& keypoints,
+    cv::Mat& descriptors) {
+  cv::Mat img = cv::imread(path.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+  if (!img.data) {
+    return false;
+  }
+ 
+  cv::SurfFeatureDetector detector;
+  cv::SurfDescriptorExtractor extractor;
+ 
+  detector.detect(img, keypoints);
+  extractor.compute(img, keypoints, descriptors);
+ 
+  return true;
+}
+
+void FindMatches(
+    std::vector<cv::DMatch>* matches,
+    cv::Mat& desc_a,
+    cv::Mat& desc_b,
+    float threshold) {
+  cv::FlannBasedMatcher matcher;
+  std::vector<cv::DMatch> all;
+  matcher.match(desc_a, desc_b, all);
+
+  float min = 1e6, max = -1e6;
+  for (int i = 0, n = all.size(); i < n; i++) {
+    min = std::min(min, all[i].distance);
+    max = std::max(max, all[i].distance);
+  }
+
+  for (int i = 0, n = all.size(); i < n; i++) {
+    float dist = (all[i].distance - min) / (max - min);
+    if (dist < threshold) {
+      continue;
+    }
+    matches->push_back(all[i]);
+  }
 }
 
 } // anonymous
