@@ -23,16 +23,26 @@
 
 namespace {
 
+// A structure that encapsulates a photo, its pixel data and its feature
+// descriptors.
 struct Photo {
   Photo(std::string filename, cv::Mat image) : filename(filename), image(image) {
   }
 
+  // the relative path to the photo file
   std::string filename;
+
+  // the pixel data for the photo
   cv::Mat image;
+
+  // the feature keypoints
   std::vector<cv::KeyPoint> key_points;
+
+  // the feature descriptors
   cv::Mat descriptors;
 };
 
+// A simple 2D translation
 struct Tx {
   Tx(double x, double y) : x(x), y(y) {
   } 
@@ -40,6 +50,8 @@ struct Tx {
   double x, y;
 };
 
+// Read a file containing a single file per line. Lines that begin with '#'
+// are treated as comments and excluded.
 Status ReadFileList(std::vector<std::string>* out, std::string& filename) {
   std::ifstream r(filename);
   if (!r.is_open()) {
@@ -69,11 +81,17 @@ Status ReadFileList(std::vector<std::string>* out, std::string& filename) {
   return NoErr();
 }
 
+// A stupid and incomplete inconvenience function allowing us to abort
+// from an error message.
 void Panic(const std::string& msg) {
   fprintf(stderr, "ERROR: %s\n", msg.c_str());
   exit(1);
 }
 
+// Load all the photos by reading the files in filename and populating the Photo objects
+// in the vector photos. This will print status into the console. Also note that OpenCV's
+// detectors and extractors are optimized for multicore so there is no need for application
+// level parallelism.
 Status LoadPhotos( std::vector<std::shared_ptr<Photo> >* photos, std::string& filename) {
   std::vector<std::string> filenames;
   Status did = ReadFileList(&filenames, filename);
@@ -105,6 +123,11 @@ Status LoadPhotos( std::vector<std::shared_ptr<Photo> >* photos, std::string& fi
   return NoErr();
 }
 
+// Find the median tranlation in the vertical and horizontal directions. This is
+// an overly simple way to find the transformation between two photos, but it works
+// in this case.
+//
+// TODO(knorton): Use medians of medians to be less stupid.
 void FindMedianTransform(
     std::vector<cv::KeyPoint>& a,
     std::vector<cv::KeyPoint>& b,
@@ -130,6 +153,7 @@ void FindMedianTransform(
   *y = dy[dy.size() / 2];
 }
 
+// Find the global translation for each photo in the vector photos.
 void FindTransforms(
     std::vector<Tx>* translations,
     std::vector<std::shared_ptr<Photo> > photos) {
@@ -168,6 +192,8 @@ void FindTransforms(
   printf("\ndone\n");
 }
 
+// Select strips that properly fill the output image. This will discard photos what would not
+// provide any pixels for their assigned strip location.
 void SelectStrips(std::vector<std::shared_ptr<Photo> >& photos, std::vector<Tx>& transforms) {
   int w = photos[0]->image.cols;
 
@@ -184,6 +210,8 @@ void SelectStrips(std::vector<std::shared_ptr<Photo> >& photos, std::vector<Tx>&
   }
 }
 
+// Find the range of deviation in transforms (in the vertical direction). This is primarily used
+// to find out how much the viewport should be adjusted when creating target images.
 void FindVerticalBounds(double* top, double* bot, std::vector<Tx>& transforms) {
   double t = 0.0, b = 0.0;
   for (int i = 0, n = transforms.size(); i < n; i++) {
@@ -198,6 +226,9 @@ void FindVerticalBounds(double* top, double* bot, std::vector<Tx>& transforms) {
   *bot = b;
 }
 
+// Used for debugging: Render each pair of images to debug their computed translation. The first
+// image will be rendered in the background and then the second image will be rendered with opacity
+// of 0.5 over the first, with the computed translations applied.
 Status RenderOverlayForEachTransform(
     const std::string& dest,
     std::vector<std::shared_ptr<Photo> >& photos,
@@ -232,6 +263,7 @@ Status RenderOverlayForEachTransform(
 
     CGContextSaveGState(ctx);
     CGContextSetAlpha(ctx, 0.5);
+    CGContextTranslateCTM(ctx, -tx, -ty);
     CGContextDrawImage(ctx, CGRectMake(0, 0, w, h), imb);
     CGContextRestoreGState(ctx);
 
@@ -249,6 +281,9 @@ Status RenderOverlayForEachTransform(
   return NoErr();
 }
 
+// Used for debugging: Render an image that contains the bounding box of each
+// photo relative to every other image. This is a way to understand the bounds
+// of computed translations.
 Status RenderTransformMap(
     const std::string& dest,
     float dst_width,
@@ -280,7 +315,7 @@ Status RenderTransformMap(
 
   CGContextTranslateCTM(ctx, padding, padding);
 
-  CGContextSetRGBStrokeColor(ctx, 0.2, 0.2, 0.2, 0.5);
+  CGContextSetRGBStrokeColor(ctx, 0.6, 0.0, 0.0, 0.5);
   CGContextSetLineWidth(ctx, 2.0);
   for (int i = 0, n = transforms.size(); i < n; i++) {
     Tx tx = transforms[i];
@@ -296,6 +331,7 @@ Status RenderTransformMap(
   return gr::ExportAsPng(ctx, dest);
 }
 
+// Render each of the slices for the composite images into the given directory.
 Status RenderSlices(
     const std::string& dest,
     std::vector<std::shared_ptr<Photo> >& photos,
@@ -347,6 +383,9 @@ Status RenderSlices(
   return NoErr();
 }
 
+// Used for debugging: Render a composite images of each of the slices. This makes
+// debugging easy as it allows you to view the composite without rendering the
+// individual strips in a browser.
 Status Render(
     const std::string& dest,
     std::vector<std::shared_ptr<Photo> >& photos,
@@ -388,10 +427,12 @@ Status Render(
   return gr::ExportAsJpg(ctx, path, 0.9);
 }
 
+// Just print the usage of the program.
 void PrintUsage() {
   fprintf(stderr, "Usage: strip [--dest=dir] file_list\n");
 }
 
+// Parse the command line arguments of the program.
 bool ParseArgs(int argc, char* argv[],
     std::string* src_file,
     std::string* dest_dir,
@@ -440,6 +481,8 @@ bool ParseArgs(int argc, char* argv[],
   return true;
 }
 
+// Extract the date from the EXIF metadata of the photo. The results are appended to
+// out using the given format.
 Status ExtractExifDate(std::string* out, const char* format, std::string filename) {
   try {
     Exiv2::Image::AutoPtr image = Exiv2::ImageFactory::open(filename.c_str());
@@ -486,6 +529,7 @@ Status ExtractExifDate(std::string* out, const char* format, std::string filenam
   return NoErr();
 }
 
+// Create a JSON file that has time information for each of the photos.
 Status WriteInfoFile(std::string& filename, std::vector<std::shared_ptr<Photo> >& photos) {
   util::File file;
   Status did = file.Open(filename.c_str(), "w");
