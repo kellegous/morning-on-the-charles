@@ -567,7 +567,7 @@ Status WriteInfoFile(std::string& filename, std::vector<std::shared_ptr<Photo> >
 int main(int argc, char* argv[]) {
 
   std::string dest("out");
-  std::string data("day.txt");
+  std::string data;
   bool render_overlay_for_each_transform = false;
   bool render_transform_map = false;
 
